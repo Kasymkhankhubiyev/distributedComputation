@@ -98,20 +98,22 @@ if rank != 0:
 
 if rank == 0:
     b = np.empty(N, dtype=np.float64)
-    # b_part = np.empty(M // (numprocs - 1), dtype=np.float64)
+    b_part = np.empty(M // (numprocs - 1), dtype=np.float64)
     
-    # данные получаем по мере решения блоков
-    comm.Recv(b[(k-1)* M // (numprocs - 1): k* M // (numprocs - 1)], source=MPI.ANY_SOURCE)
-    # + we need to know a reciev status to know a sender index
-
     # данные получаются по порядку
     for k in range(1, numprocs):
         # comm.Recv(b_part, source=k)
-        comm.Recv(b[(k-1)* M // (numprocs - 1): k* M // (numprocs - 1)], source=k)
-        # b[(k-1)* M // (numprocs - 1): k* M // (numprocs - 1)] += b_part
+        # comm.Recv(b[(k-1)* M // (numprocs - 1): k* M // (numprocs - 1)], source=k)
+
+        # данные получаем по мере решения блоков
+        status = MPI.Status()
+        # comm.Recv(b[(status.Get_source()-1)* M // (numprocs - 1): status.Get_source()* M // (numprocs - 1)], source=MPI.ANY_SOURCE, status=status)
+        comm.Recv(b_part, source=MPI.ANY_SOURCE, tag=MPI.ANY_TAG, status=status)
+        # + we need to know a recieve status to know a sender index
+        b[(status.Get_source()-1) * M // (numprocs - 1): status.Get_source() * M // (numprocs - 1)] += b_part
     print(b)
 else:
-    comm.Send(b_part, dest=0)
+    comm.Send(b_part, dest=0, tag=rank)
 	
 # # Основная вычислительная часть программы
 # # Умножаем матрцу A на вектор x
