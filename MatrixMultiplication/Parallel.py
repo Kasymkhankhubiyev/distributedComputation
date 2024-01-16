@@ -75,7 +75,8 @@ if rank == 0:
                 A_part[j,i] = float(f2.readline())
         comm.Send(A_part, dest=k)
     f2.close()
-    del A_part
+    # del A_part
+    A_part = np.empty((0, N), dtype=np.float64)
 else:
     A_part = np.empty((M // (numprocs - 1), N), dtype=np.float64); 
     comm.Recv(A_part, source=0)
@@ -90,30 +91,75 @@ if rank == 0:
 
 comm.Bcast(x, root=0)
 
-if rank != 0:
-    b_part = np.dot(A_part, x)
+# if rank != 0:
+    # b_part = np.dot(A_part, x)
+
+b_part = np.dot(A_part, x)
 
 # if rank == 2:
 #     print(b_part)
 
+# if rank == 0:
+#     b = np.empty(N, dtype=np.float64)
+#     # b_part = np.empty(M // (numprocs - 1), dtype=np.float64)
+
+#     status = MPI.Status()
+    
+#     # данные получаются по порядку
+#     for k in range(1, numprocs):
+#         # comm.Recv(b_part, source=k)
+#         # comm.Recv(b[(k-1)* M // (numprocs - 1): k* M // (numprocs - 1)], source=k)
+
+#         # # данные получаем по мере решения блоков
+#         # # comm.Recv(b[(status.Get_source()-1)* M // (numprocs - 1): status.Get_source()* M // (numprocs - 1)], source=MPI.ANY_SOURCE, status=status)
+#         # comm.Recv(b_part, source=MPI.ANY_SOURCE, tag=MPI.ANY_TAG, status=status)
+#         # # + we need to know a recieve status to know a sender index
+#         # b[(status.Get_source()-1) * M // (numprocs - 1): status.Get_source() * M // (numprocs - 1)] = b_part
+
+
+#         # зондирование - получаем информацию о входящем сигнале и заполняем статус
+#         comm.Probe(source=MPI.ANY_SOURCE, status=status)
+#         comm.Recv(b[(status.Get_source()-1) * M // (numprocs - 1): status.Get_source() * M // (numprocs - 1)], 
+#                   source=status.Get_source(), status=status)
+
+#         # use Gather or Gatherv
+#     # b = np.empty(N, dtype=np.float64)
+#     # b_part = np.empty(M // (numprocs - 1), dtype=np.float64)
+#     # b = comm.Gather(b_part, b, root=0)
+# else:
+#     b = None
+#     comm.Send(b_part, dest=0) #, tag=rank)
+        
+
+# Каскадный алгоритм - время работы log_2(N), N - число процессов
+# Gather function - a function of collective interaction,
+# it is runnable only if all processes run the command
+# Gather uses only data with the same size
+# Gatherv allows to use data with different sizes
+
+# b = comm.Gather(b_part, b, root=0)
+# comm.Gather([sendbuf, scount, stype], [recbuf, rcount, rtype], root)
+    
+rcounts = np.empty(numprocs, dtype=np.int32)
+displs = np.empty(numprocs, dtype=np.int32)
+
+rcounts[0] = 0
+displs[0] = 0
+
+for k in range(1, numprocs):
+    rcounts[k] = M // (numprocs - 1)
+    displs[k] = displs[k-1] + rcounts[k-1]
+
 if rank == 0:
     b = np.empty(N, dtype=np.float64)
-    b_part = np.empty(M // (numprocs - 1), dtype=np.float64)
-    
-    # данные получаются по порядку
-    for k in range(1, numprocs):
-        # comm.Recv(b_part, source=k)
-        # comm.Recv(b[(k-1)* M // (numprocs - 1): k* M // (numprocs - 1)], source=k)
-
-        # данные получаем по мере решения блоков
-        status = MPI.Status()
-        # comm.Recv(b[(status.Get_source()-1)* M // (numprocs - 1): status.Get_source()* M // (numprocs - 1)], source=MPI.ANY_SOURCE, status=status)
-        comm.Recv(b_part, source=MPI.ANY_SOURCE, tag=MPI.ANY_TAG, status=status)
-        # + we need to know a recieve status to know a sender index
-        b[(status.Get_source()-1) * M // (numprocs - 1): status.Get_source() * M // (numprocs - 1)] += b_part
-    print(b)
 else:
-    comm.Send(b_part, dest=0, tag=rank)
+    b = None
+
+comm.Gatherv([b_part, rcounts[rank], MPI.DOUBLE], 
+             [b, rcounts, displs, MPI.DOUBLE], root=0)
+
+if rank == 0:
+    print(b)
 	
 # # Основная вычислительная часть программы
 # # Умножаем матрцу A на вектор x
