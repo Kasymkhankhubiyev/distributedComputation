@@ -51,13 +51,23 @@ print(f'for rank: {rank} dot_prod: {scalP_temp}')
 
 # Reduce, Allreduce - в первом результат на корневом процессе, 
 # а во втором с корневого бродкастом на все процесссы раскидываем
+# TODO: replace the following code block with a Reduce command
+# if rank == 0:
+#     output = scalP_temp.copy()
+#     for k in range(1, numprocs):
+#         comm.Recv(scalP_temp, source=MPI.ANY_SOURCE)
+#         output += scalP_temp
+    
+#     print(f'total dot product is {output}')
+# else:
+#     comm.Send(scalP_temp, dest=0)
 
 if rank == 0:
     output = scalP_temp.copy()
-    for k in range(1, numprocs):
-        comm.Recv(scalP_temp, source=MPI.ANY_SOURCE)
-        output += scalP_temp
-    
-    print(f'total dot product is {output}')
 else:
-    comm.Send(scalP_temp, dest=0)
+    output = None
+
+comm.Reduce(scalP_temp, output, MPI.SUM, root=0)
+
+if rank == 0:
+    print(output)
