@@ -1,5 +1,6 @@
 # from numpy import empty, int32, array
 import numpy as np
+import sys
 from mpi4py import MPI
 
 comm = MPI.COMM_WORLD
@@ -60,26 +61,61 @@ else:
     # comm.Recv([N, 1, MPI.INT], source=0, tag=0)
     
 
-print(f'For rank={rank}: N={N} , M={M}')
+# print(f'For rank={rank}: N={N} , M={M}')
+    
+if rank == 0:
+    rcounts = np.empty(numprocs, dtype=np.int32)
+    displs = np.empty(numprocs, dtype=np.int32)
+
+    # rcounts[0] = 0
+    displs[0] = 0
+
+    ave, res = divmod(M, numprocs)
+
+    for k in range(0, numprocs):
+        if k < res:
+            rcounts[k] = ave + 1
+        else:
+            rcounts[k] = ave
+        displs[k] = displs[k-1] + rcounts[k-1]
+
+    print(rcounts, displs)
+else:
+    rcounts, displs = None, None
+
+M_part = np.array(1, dtype=np.int32)
+
+comm.Scatter([rcounts, 1, MPI.INT], [M_part, 1, MPI.INT], root=0)
+
+# print(f'rank {rank}, M: {M_part}')
 
 # # Выделяем под матрицы A,x и b соответствующее место в памяти
 # A = np.empty((M,N)); x = np.empty(N); b = np.empty(M)
+
+print(f'for rank: {rank} M_part: {M_part}, N: {N}')
 	
 if rank == 0:
     # Считываем из файла матрицу A
     f2 = open('AData.dat', 'r')
+    A_part = np.empty((M_part, N), dtype=np.float64)
+    for j in range(M_part) :
+        for i in range(N) :
+            A_part[j,i] = float(f2.readline())
+
     for k in range(1, numprocs):
-        A_part = np.empty((M // (numprocs - 1),N), dtype=np.float64)
-        for j in range(M // (numprocs - 1)) :
+        A_part_temp = np.empty((rcounts[k] ,N), dtype=np.float64)
+        for j in range(rcounts[k]) :
             for i in range(N) :
-                A_part[j,i] = float(f2.readline())
-        comm.Send(A_part, dest=k)
+                A_part_temp[j,i] = float(f2.readline())
+        comm.Send(A_part_temp, dest=k)
     f2.close()
-    # del A_part
-    A_part = np.empty((0, N), dtype=np.float64)
+    del A_part_temp
+    # A_part = np.empty((0, N), dtype=np.float64)
 else:
-    A_part = np.empty((M // (numprocs - 1), N), dtype=np.float64); 
+    A_part = np.empty((M_part, N), dtype=np.float64); 
     comm.Recv(A_part, source=0)
+
+# sys.exit()
 		
 # Считываем из файла вектор x
 x = np.empty(N, dtype=np.float64)
@@ -139,16 +175,12 @@ b_part = np.dot(A_part, x)
 
 # b = comm.Gather(b_part, b, root=0)
 # comm.Gather([sendbuf, scount, stype], [recbuf, rcount, rtype], root)
-    
-rcounts = np.empty(numprocs, dtype=np.int32)
-displs = np.empty(numprocs, dtype=np.int32)
 
-rcounts[0] = 0
-displs[0] = 0
+sys.exit()
 
-for k in range(1, numprocs):
-    rcounts[k] = M // (numprocs - 1)
-    displs[k] = displs[k-1] + rcounts[k-1]
+# for k in range(1, numprocs):
+#     rcounts[k] = M // (numprocs - 1)
+#     displs[k] = displs[k-1] + rcounts[k-1]
 
 if rank == 0:
     b = np.empty(N, dtype=np.float64)
