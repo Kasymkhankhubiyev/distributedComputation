@@ -29,7 +29,7 @@ for j in range(M) :
 f2.close()
 		
 f3 = open('bData.dat', 'r')
-for j in range(M) :
+for j in range(M):
     b[j] = float(f3.readline())
 f3.close()
 
