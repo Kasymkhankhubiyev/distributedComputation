@@ -62,12 +62,25 @@ print(f'for rank: {rank} dot_prod: {scalP_temp}')
 # else:
 #     comm.Send(scalP_temp, dest=0)
 
+# via Reduce
+# if rank == 0:
+#     output = np.array(0, dtype=np.float64)
+#     # output = scalP_temp.copy()
+# else:
+#     output = None
+
+# comm.Reduce([scalP_temp, 1, MPI.DOUBLE], [output, 1, MPI.DOUBLE], MPI.SUM, root=0)
+    
+# if rank == 0:
+#     print(output)
+
+# via Allreduce
+
 if rank == 0:
-    output = scalP_temp.copy()
+    output = np.array(0, dtype=np.float64)
 else:
-    output = None
+    output = np.array(0, dtype=np.float64)
 
-comm.Reduce(scalP_temp, output, MPI.SUM, root=0)
+comm.Allreduce([scalP_temp, 1, MPI.DOUBLE], [output, 1, MPI.DOUBLE], MPI.SUM)
 
-if rank == 0:
-    print(output)
+print(f'for process with rank: {rank} summ is {output}')
