@@ -62,6 +62,8 @@ print(f'for rank: {rank} dot_prod: {scalP_temp}')
 # else:
 #     comm.Send(scalP_temp, dest=0)
 
+# -- # -- # -- # -- # -- # -- # -- # -- # -- #
+
 # via Reduce
 # if rank == 0:
 #     output = np.array(0, dtype=np.float64)
@@ -73,6 +75,8 @@ print(f'for rank: {rank} dot_prod: {scalP_temp}')
     
 # if rank == 0:
 #     print(output)
+
+# -- # -- # -- # -- # -- # -- # -- # -- # -- # 
 
 # via Allreduce
 
