@@ -99,10 +99,9 @@ if rank == 0:
     f1.close()
 else:
     N = np.array(0, dtype=np.int32)
-    M = None 
+    M = None
 
 comm.Bcast(N, root=0)
-
 
 def auxiallary_arrays(M: int, numprocs: int):
     rcounts = np.empty(numprocs, dtype=np.int32)
@@ -171,7 +170,7 @@ x = np.zeros(N, dtype=np.float64)
 
 x = conjugate_gradient_method(A_part, b, x, N, M, 
                               M_part, N_part, comm,
-                              rcounts_M, rcounts_N, 
+                              rcounts_M, rcounts_N,
                               displs_M, displs_N)
 
 if rank == 0:
