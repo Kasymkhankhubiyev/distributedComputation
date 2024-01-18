@@ -13,7 +13,60 @@ def conjugate_gradient_method(A_part: np.ndarray, b_part: np.ndarray,
                               x_part: np.ndarray, N: int, N_part: int, 
                               rcounts_N: np.ndarray, displs_N: np.ndarray) -> np.ndarray:
     
-    pass
+    x = np.empty(N, dtype=np.float64)
+    p = np.empty(N, dtype=np.float64)
+
+    r_part = np.empty(N_part, dtype=np.float64)
+    p_part = np.empty(N_part, dtype=np.float64)
+    q_part = np.empty(N_part, dtype=np.float64)
+
+    ScalP = np.array(0, dtype=np.float64)
+    ScalP_temp = np.array(0, dtype=np.float64)
+
+    s = 1
+    p_part = 0.
+
+    while s <= N:
+        if s == 1:
+            comm.allgatherv([x_part, N_part, MPI.DOUBLE],
+                            [x, rcounts_N, displs_N, MPI.DOUBLE])
+            r_temp = np.dot(A_part.T, np.dot(A_part, x) - b_part)
+            
+            comm.Reduce_scatter([r_temp, N, MPI.DOUBLE],
+                                [r_part, N_part, MPI.DOUBLE],
+                                rcounts_N, MPI.SUM)
+        else:
+            ScalP_temp = np.array(np.dot(p_part, q_part), dtype=np.float64)
+            comm.Allreduce([ScalP_temp, 1, MPI.DOUBLE],
+                           [ScalP, 1, MPI.DOUBLE], MPI.SUM)
+            
+            r_part = r_part - q_part / ScalP
+        
+        ScalP_temp = np.array(np.dot(r_part, r_part))
+        comm.Allreduce([ScalP_temp, 1, MPI.DOUBLE],
+                       [ScalP, 1, MPI.DOUBLE], MPI.SUM)
+        p_part = p_part + r_part / ScalP
+
+        comm.Allgatherv([p_part, N_part, MPI.DOUBLE],
+                       [p, rcounts_N, displs_N, MPI.DOUBLE])
+        
+        q_temp = np.dot(A_part.T, np.dot(A_part, p))
+
+        comm.Reduce_scatter([q_temp, N, MPI.DOUBLE],
+                            [q_part, N_part, MPI.DOUBLE],
+                            rcounts_N, MPI.SUM)
+        
+        ScalP_temp = np.array(np.dot(p_part, q_part))
+        comm.Allreduce([ScalP_temp, 1, MPI.DOUBLE],
+                       [ScalP, 1, MPI.DOUBLE], MPI.SUM)
+        
+        x_part = x_part - p_part / ScalP
+
+        s += 1
+
+    return x
+
+
 
 if rank == 0:
     f1 = open('in.dat', 'r')
