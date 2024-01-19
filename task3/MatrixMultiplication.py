@@ -19,22 +19,70 @@ rank = comm.Get_rank()
 num_rows = num_cols = np.int32(np.sqrt(numprocs))
 # num_rows = num_cols = 3
 
-def conjugate_gradient_method(A, b, x, N) :
+def conjugate_gradient_method(A_part, b_part, x_part, N) :
     s = 1
-    p = np.zeros(N)
+    p_part = np.zeros(N_part, dtype=np.float64)
     while s <= N :
         if s == 1 :
-            r = np.dot(A.T, np.dot(A,x) - b)
-        else :
-            r = r - q/np.dot(p, q)
-        p = p + r/np.dot(r, r)
-        q = np.dot(A.T, np.dot(A, p))
-        x = x - p/np.dot(p,q)
+            # paralleling the following code line:
+            # r = np.dot(A.T, np.dot(A,x) - b)
+            Ax_part_temp = np.dot(A_part, x_part)
+            Ax_part = np.empty(M_part, np.float64)
+            # Data sending is transfering parallel inside 
+            # every commutator over a row
+            comm_row.Allreduce(Ax_part_temp, Ax_part, op=MPI.SUM)
+
+            Ax_part = Ax_part - b_part
+
+            # now each process in a row has a corresponding part
+            # of a column Ax_part
+            r_part_temp = np.dot(A_part.T, Ax_part)
+            r_part = np.empty(N_part, dtype=np.float64)
+            comm_col.Allreduce(r_part_temp, r_part, op=MPI.SUM)
+        else:
+            # paralleling the following code line:
+            # r = r - q/np.dot(p, q)
+            # ScalP_temp = np.array(np.dot(p_part, q_part), dtype=np.float64)
+            # ScalP = np.array(0, dtype=np.float64)
+
+            # comm_row.Allreduce(ScalP_temp, ScalP, op=MPI.SUM)
+            r_part = r_part - q_part / ScalP
+
+        # paralleling the following code line:
+        # p = p + r/np.dot(r, r)
+        ScalP_temp = np.array(np.dot(r_part, r_part), dtype=np.float64)
+        ScalP = np.array(0, dtype=np.float64)
+
+        comm_row.Allreduce(ScalP_temp, ScalP, op=MPI.SUM)
+        p_part = p_part + r_part / ScalP
+
+        # paralleling the following code line:
+        # q = np.dot(A.T, np.dot(A, p))
+        Ap_part_temp = np.dot(A_part, p_part)
+        Ap_part = np.empty(M_part, np.float64)
+        # Data sending is transfering parallel inside 
+        # every commutator over a row
+        comm_row.Allreduce(Ap_part_temp, Ap_part, op=MPI.SUM)
+
+        # now each process in a row has a corresponding part
+        # of a column Ap_part
+        q_part_temp = np.dot(A_part.T, Ap_part)
+        q_part = np.empty(N_part, dtype=np.float64)
+        # sum up all q parts and trasfer it over column processes
+        comm_col.Allreduce(q_part_temp, q_part, op=MPI.SUM)
+
+        # paralleling the following code line:
+        # x = x - p/np.dot(p,q)
+        ScalP_temp = np.array(np.dot(p_part, q_part), dtype=np.float64)
+        ScalP = np.array(0, dtype=np.float64)
+        comm_row.Allreduce(ScalP_temp, ScalP, op=MPI.SUM)
+        x_part = x_part - p_part / ScalP
+
         s = s + 1
-    return x
+    return x_part
 
 N = np.array(200, dtype=np.int32)
-M = np.array(200, dtype=np.int32)
+M = np.array(300, dtype=np.int32)
 
 def auxiallary_arrays(M: int, numprocs: int):
     rcounts = np.empty(numprocs, dtype=np.int32)
@@ -98,19 +146,48 @@ comm_col.Bcast(N_part, root=0)
 A_part = np.random.random_sample((M_part, N_part))
 
 if rank == 0:
-    x_model = np.array([np.sin(2+np.pi*i)/(N-1) for i in range(N)], 
+    x_model = np.array([np.sin(2*np.pi*i/(N-1)) for i in range(N)], 
                        dtype=np.float64)
+else:
+    x_model = None
     
+x_part = np.empty(N_part, dtype=np.float64)
 
+# now we need to scatter a vector x over processes
+# included into one row -> x_part
+# after that we spread same x_parts over processes
+# included into one column
+if rank in range(num_cols):
+    comm_row.Scatterv([x_model, rcounts_N, displs_N, MPI.DOUBLE],
+                      [x_part, N_part, MPI.DOUBLE], root=0)
+    
+comm_col.Bcast([x_part, N_part, MPI.DOUBLE], root=0)
 
+# in every process get its own b as a dot product
+b_part_temp = np.dot(A_part, x_part)
+b_part = np.empty(M_part, np.float64)
 
-x = np.zeros(N)
+# and sum up all the dot products inside a corresponding 
+# row group of processes
+comm_row.Allreduce(b_part_temp, b_part, op=MPI.SUM)
 
-x = conjugate_gradient_method(A, b, x, N)
+x_part = np.zeros(N_part, dtype=np.float64)
 
-fig = figure()
-ax = axes(xlim=(0, N), ylim=(-1.5, 1.5))
-ax.set_xlabel('i'); ax.set_ylabel('x[i]')
-ax.plot(np.arange(N), x, '-r', lw=3)
+x_part = conjugate_gradient_method(A_part, b_part, x_part, N)
 
-show()
+if rank == 0:
+    x = np.empty(N, dtype=np.float64)
+else:
+    x = None
+
+if rank in range(num_cols):
+    comm_row.Gatherv([x_part, N_part, MPI.DOUBLE],
+                     [x, rcounts_N, displs_N, MPI.DOUBLE], root=0)
+
+if rank == 0:
+    fig = figure()
+    ax = axes(xlim=(0, N), ylim=(-1.5, 1.5))
+    ax.set_xlabel('i'); ax.set_ylabel('x[i]')
+    ax.plot(np.arange(N), x, '-r', lw=3)
+
+    show()
