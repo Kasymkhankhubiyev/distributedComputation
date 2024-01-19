@@ -33,17 +33,8 @@ def conjugate_gradient_method(A, b, x, N) :
         s = s + 1
     return x
 
-# Считываем из файла число строк M и число столбцов N
-if rank == 0:
-    f1 = open('in.dat', 'r')
-    N = np.array(int(f1.readline()), dtype=np.int32)
-    M = np.array(int(f1.readline()), dtype=np.int32)
-    f1.close()
-else:
-    N = np.array(0, dtype=np.int32)
-    M = None
-
-comm.Bcast(N, root=0)
+N = np.array(200, dtype=np.int32)
+M = np.array(200, dtype=np.int32)
 
 def auxiallary_arrays(M: int, numprocs: int):
     rcounts = np.empty(numprocs, dtype=np.int32)
@@ -102,21 +93,16 @@ if rank in range(num_cols):
 # broadcasting data over rows
 comm_col.Bcast(N_part, root=0)
 
-print(f'for rank = {rank}: M_part = {M_part}, N_part = {N_part}')
+# print(f'for rank = {rank}: M_part = {M_part}, N_part = {N_part}')
+
+A_part = np.random.random_sample((M_part, N_part))
+
+if rank == 0:
+    x_model = np.array([np.sin(2+np.pi*i)/(N-1) for i in range(N)], 
+                       dtype=np.float64)
+    
 
 
-sys.exit()
-	
-f2 = open('AData.dat', 'r')
-for j in range(M) :
-    for i in range(N) :
-        A[j,i] = float(f2.readline())
-f2.close()
-		
-f3 = open('bData.dat', 'r')
-for j in range(M):
-    b[j] = float(f3.readline())
-f3.close()
 
 x = np.zeros(N)
 
