@@ -1,7 +1,7 @@
 from mpi4py import MPI
 
 """
-    Run the programm as ``mpiexec -n 4 python example.py``
+    Run the programm as ``mpiexec -n 8 python example.py``
 """
 
 comm = MPI.COMM_WORLD
