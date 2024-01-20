@@ -51,12 +51,6 @@ def conjugate_gradient_method(A_part, b_part, x_part, N) :
             r_part = np.empty(N_part, dtype=np.float64)
             comm_col.Allreduce(r_part_temp, r_part, op=MPI.SUM)
         else:
-            # paralleling the following code line:
-            # r = r - q/np.dot(p, q)
-            # ScalP_temp = np.array(np.dot(p_part, q_part), dtype=np.float64)
-            # ScalP = np.array(0, dtype=np.float64)
-
-            # comm_row.Allreduce(ScalP_temp, ScalP, op=MPI.SUM)
             r_part = r_part - q_part / ScalP
 
         # paralleling the following code line:
@@ -151,8 +145,6 @@ if rank_cart in range(num_cols):
     
 # broadcasting data over rows
 comm_col.Bcast(N_part, root=0)
-
-# print(f'for rank = {rank}: M_part = {M_part}, N_part = {N_part}')
 
 A_part = np.random.random_sample((M_part, N_part))
 
