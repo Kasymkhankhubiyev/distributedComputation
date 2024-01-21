@@ -11,6 +11,8 @@ rank = comm.Get_rank()
 num_row = 2
 num_col = 4
 
+# создаем Декартову топологию - процессы находятся в узлах
+# декартовой сетки
 comm_cart = comm.Create_cart(dims=[num_row, num_col],
                              periods=(True, True),
                              reorder=True)

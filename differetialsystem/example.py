@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 a, b = 0., 1.
 t_0, T = 0., 6.
 
-x_0, eps = .6, 10**(-15)
+x_0, eps = .6, 10**(-1.5)
 
 N, M= 200, 20000
 
