@@ -13,8 +13,8 @@ rank_cart = comm_cart.Get_rank()
 
 
 # constants
-# N = 800; M = 300000
-N = 200; M = 20000
+N = 800; M = 300000
+# N = 200; M = 20000
 
 a = 0.; b = 1.
 t_0 = 0.; T = 6.0
@@ -30,9 +30,11 @@ def u_init(x) :
     u_init = np.sin(3*np.pi*(x - 1/6))
     return u_init
 
+
 def u_left(t) :
     u_left = -1.
     return u_left
+
 
 def u_right(t) :
     u_right = 1.
@@ -154,7 +156,7 @@ if rank_cart == 0:
     # comm_cart.Gatherv([u_part_aux[m, :], N_part_aux, MPI.DOUBLE],
     #                   [u, rcounts_aux, displs_aux, MPI.DOUBLE], root=0)
 
-    # if rank_cart == 0:
+    # if rank_cart == 0:``
         # fig = figure()
         # ax = axes(xlim=(a,b), ylim=(-2.0, 2.0))
         # ax.set_xlabel('x')
