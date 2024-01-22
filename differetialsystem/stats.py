@@ -26,17 +26,9 @@ En_700_200_000_ = calc_En(arr_700_200_000_)
 
 
 fig, axs = plt.subplots(nrows=2, ncols=1, figsize=(6, 7))
-# axs[0].set_xlabel('n')
-# axs[0].set_ylabel('second')
-# axs[0].plot(np.arange(1, len(arr_800_300_000_)+1), arr_800_300_000_, color='red', label='N=800, M=300000')
-# axs[0].plot(np.arange(1, len(arr_800_250_000_)+1), arr_800_250_000_, color='green', label='N=800, M=250000')
-# axs[0].plot(np.arange(1, len(arr_700_200_000_)+1), arr_700_200_000_, color='blue', label='N=700, M=200000')
 
 axs[0].set_xlabel('n')
 axs[0].set_ylabel('Sn')
-# axs[1].plot(np.arange(1, len(Sn_800_300_000_)+1), 
-#             (np.zeros_like(Sn_800_300_000_) + Sn_800_300_000_) / np.arange(1, len(Sn_800_300_000_)+1),
-#             color='orange', label='ideal')
 axs[0].plot(np.arange(1, len(Sn_800_300_000_)+1), np.arange(1, len(Sn_800_300_000_)+1), 
             color='orange', label='ideal')
 axs[0].plot(np.arange(1, len(Sn_800_300_000_)+1), Sn_800_300_000_, color='red', label='N=800, M=300000')
@@ -46,8 +38,6 @@ axs[0].legend()
 
 axs[1].set_xlabel('n')
 axs[1].set_ylabel('En')
-# axs[1].plot(np.arange(1, len(Sn_800_300_000_)+1), np.arange(1, len(Sn_800_300_000_)+1), 
-#             color='orange', label='ideal')
 axs[1].plot(np.arange(1, len(En_800_300_000_)+1), 
             (np.zeros_like(En_800_300_000_) + En_800_300_000_) / np.arange(1, len(En_800_300_000_)+1),
             color='orange', label='ideal')
