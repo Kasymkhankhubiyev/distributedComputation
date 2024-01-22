@@ -13,7 +13,8 @@ rank_cart = comm_cart.Get_rank()
 
 
 # constants
-N = 800; M = 300000
+# N = 800; M = 300000
+N = 200; M = 20000
 
 a = 0.; b = 1.
 t_0 = 0.; T = 6.0
@@ -137,8 +138,7 @@ if rank_cart == 0:
 else:
     u = None
 
-
-comm_cart.Gatherv([u_part_aux[M, :], N_part_aux, MPI.DOUBLE],
+comm_cart.Gatherv([u_part_aux[m, :], N_part_aux, MPI.DOUBLE],
                   [u, rcounts_aux, displs_aux, MPI.DOUBLE], root=0)
 
 if rank_cart == 0:
@@ -148,3 +148,19 @@ if rank_cart == 0:
     ax.set_ylabel('y')
     ax.plot(x, u, color='r', ls='-', lw=2)
     show()
+
+
+# for m in range(1, M):
+    # comm_cart.Gatherv([u_part_aux[m, :], N_part_aux, MPI.DOUBLE],
+    #                   [u, rcounts_aux, displs_aux, MPI.DOUBLE], root=0)
+
+    # if rank_cart == 0:
+        # fig = figure()
+        # ax = axes(xlim=(a,b), ylim=(-2.0, 2.0))
+        # ax.set_xlabel('x')
+        # ax.set_ylabel('y')
+
+        # ax.plot(x, u, color='r', ls='-', lw=2)
+
+# if rank_cart == 0:
+#     show()
