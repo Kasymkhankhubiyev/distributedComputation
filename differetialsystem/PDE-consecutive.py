@@ -20,7 +20,7 @@ t_0 = 0.; T = 6.0
 
 eps = 10**(-1.5)
 
-N = 200; M = 20000
+N = 800; M = 300000
 
 h = (b - a)/N; x = linspace(a, b, N+1)
 tau = (T - t_0)/M; t = linspace(t_0, T, M+1)
