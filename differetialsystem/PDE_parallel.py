@@ -13,7 +13,7 @@ rank_cart = comm_cart.Get_rank()
 
 
 # constants
-N = 200; M = 20000
+N = 800; M = 300000
 
 a = 0.; b = 1.
 t_0 = 0.; T = 6.0
