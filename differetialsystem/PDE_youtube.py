@@ -104,26 +104,62 @@ else:
     displs_from_0 = None
 
 N_part_aux = np.array(0, dtype=np.int32)
+displ_aux = np.array(0, dtype=np.int32)
 
 comm.Scatter([rcounts_from_0, 1, MPI.INT], [N_part_aux, 1, MPI.INT], root=0)
+comm.Scatter([displs_from_0, 1, MPI.INT], [displ_aux, 1, MPI.INT], root=0)
 
+u_part_aux = np.empty((M+1, N_part_aux), dtype=np.float64)
+
+
+for n in range(N_part_aux):
+    u_part_aux[0, n] = u_init(x[displ_aux+n])
 if rank_cart == 0:
-    u = np.empty((M+1, N+1), dtype=np.float64)
-    for n in range(N+1):
-        u[0, n] = u_init(x[n])
-else:
-    u = np.empty((M+1, 0), dtype=np.float64)
-
-
-u_part = np.empty(N_part, dtype=np.float64)
-u_part_aux = np.empty(N_part_aux, dtype=np.float64)
+    for m in range(1, M+1):
+        u_part_aux[m, 0] = u_left(t[m])
+if rank_cart == numprocs-1:
+    for m in range(1, M+1):
+        u_part_aux[m, N_part_aux-1] = u_right(t[m])
 
 
 for m in range(M):
 
-    comm_cart.Scatterv([u[m], rcounts_from_0, displs_from_0, MPI.DOUBLE],
-                       [u_part_aux, N_part_aux, MPI.DOUBLE], root=0)
-    
     for n in range(1, N_part_aux-1):
-        u_part[n-1] = 0
-    
+        left_part = u_part_aux[m, n] + eps * tau * (u_part_aux[m,n+1] - 2 * u_part_aux[m,n] + u_part_aux[m, n-1]) / h ** 2
+        right_part = tau * u_part_aux[m, n] * (u_part_aux[m, n+1] - u_part_aux[m, n-1]) / (2 * h) + tau * u_part_aux[m, n] ** 3
+        u_part_aux[m+1, n] = left_part + right_part
+
+    if rank_cart == 0:
+        comm_cart.Sendrecv(sendbuf=[u_part_aux[m+1, N_part_aux-2:], 1, MPI.DOUBLE], dest=1, sendtag=0,
+                           recvbuf=[u_part_aux[m+1, N_part_aux-1:], 1, MPI.DOUBLE], source=1, recvtag=MPI.ANY_TAG,
+                           status=None)
+    elif rank_cart == numprocs-1:
+        comm_cart.Sendrecv(sendbuf=[u_part_aux[m+1, 1:], 1, MPI.DOUBLE], dest=numprocs-2, sendtag=0,
+                           recvbuf=[u_part_aux[m+1, 0:], 1, MPI.DOUBLE], source=numprocs-2, recvtag=MPI.ANY_TAG,
+                           status=None)
+    else:
+        # # обмен слева
+        comm_cart.Sendrecv(sendbuf=[u_part_aux[m+1, 1:], 1, MPI.DOUBLE], dest=rank_cart-1, sendtag=0,
+                           recvbuf=[u_part_aux[m+1, 0:], 1, MPI.DOUBLE], source=rank_cart-1, recvtag=MPI.ANY_TAG,
+                           status=None)
+        
+        # обмен справа
+        comm_cart.Sendrecv(sendbuf=[u_part_aux[m+1, N_part_aux-2:], 1, MPI.DOUBLE], dest=rank_cart+1, sendtag=0,
+                           recvbuf=[u_part_aux[m+1, N_part_aux-1:], 1, MPI.DOUBLE], source=rank_cart+1, recvtag=MPI.ANY_TAG,
+                           status=None)
+        
+
+if rank_cart == 0:
+    u_T = np.empty(N+1, dtype=np.float64)
+else:
+    u_T = None
+
+if rank_cart == 0:
+    comm_cart.Gatherv([u_part_aux[M, 0:N_part_aux], N_part_aux, MPI.DOUBLE],
+                      [u_T, rcounts, displs, MPI.DOUBLE], root=0)
+if rank_cart in range(1, numprocs-1):
+    comm_cart.Gatherv([u_part_aux[M, 1:N_part_aux-1], N_part_aux, MPI.DOUBLE],
+                      [u_T, rcounts, displs, MPI.DOUBLE], root=0)
+if rank_cart == numprocs - 1:
+    comm_cart.Gatherv([u_part_aux[M, 1:N_part_aux], N_part_aux, MPI.DOUBLE],
+                      [u_T, rcounts, displs, MPI.DOUBLE], root=0)
