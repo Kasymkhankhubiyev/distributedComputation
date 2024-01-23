@@ -25,7 +25,13 @@ En_800_250_000_ = calc_En(arr_800_250_000_)
 En_700_200_000_ = calc_En(arr_700_200_000_)
 
 
-fig, axs = plt.subplots(nrows=2, ncols=1, figsize=(6, 7))
+fig, axs = plt.subplots(nrows=3, ncols=1, figsize=(6, 7))
+axs[2].set_xlabel('n')
+axs[2].set_ylabel('second')
+axs[2].plot(np.arange(1, len(arr_800_300_000_)+1), arr_800_300_000_, color='red', label='N=800, M=300000')
+axs[2].plot(np.arange(1, len(arr_800_250_000_)+1), arr_800_250_000_, color='green', label='N=800, M=250000')
+axs[2].plot(np.arange(1, len(arr_700_200_000_)+1), arr_700_200_000_, color='blue', label='N=700, M=200000')
+axs[2].legend()
 
 axs[0].set_xlabel('n')
 axs[0].set_ylabel('Sn')
