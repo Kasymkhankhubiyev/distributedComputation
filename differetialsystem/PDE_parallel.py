@@ -108,21 +108,34 @@ for m in range(M):
         right_part = tau * u_part_aux[m, n] * (u_part_aux[m, n+1] - u_part_aux[m, n-1]) / (2 * h) + tau * u_part_aux[m, n] ** 3
         u_part_aux[m+1, n] = left_part + right_part
         
+        if n == 5:
+            if rank_cart == 0:
+                pass
+            if rank_cart == numprocs-1:
+                comm_cart.Sendrecv(sendbuf=[u_part_aux[m+1, 1:], 1, MPI.DOUBLE], dest=numprocs-2, sendtag=0,
+                                recvbuf=[u_part_aux[m+1, 0:], 1, MPI.DOUBLE], source=numprocs-2, recvtag=MPI.ANY_TAG,
+                                status=None)
+            else:
+                # обмен слева
+                comm_cart.Sendrecv(sendbuf=[u_part_aux[m+1, 1:], 1, MPI.DOUBLE], dest=rank_cart-1, sendtag=0,
+                                recvbuf=[u_part_aux[m+1, 0:], 1, MPI.DOUBLE], source=rank_cart-1, recvtag=MPI.ANY_TAG,
+                                status=None)
 
     if rank_cart == 0:
         comm_cart.Sendrecv(sendbuf=[u_part_aux[m+1, N_part_aux-2:], 1, MPI.DOUBLE], dest=1, sendtag=0,
                            recvbuf=[u_part_aux[m+1, N_part_aux-1:], 1, MPI.DOUBLE], source=1, recvtag=MPI.ANY_TAG,
                            status=None)
     elif rank_cart == numprocs-1:
-        comm_cart.Sendrecv(sendbuf=[u_part_aux[m+1, 1:], 1, MPI.DOUBLE], dest=numprocs-2, sendtag=0,
-                           recvbuf=[u_part_aux[m+1, 0:], 1, MPI.DOUBLE], source=numprocs-2, recvtag=MPI.ANY_TAG,
-                           status=None)
+        pass
+        # comm_cart.Sendrecv(sendbuf=[u_part_aux[m+1, 1:], 1, MPI.DOUBLE], dest=numprocs-2, sendtag=0,
+        #                    recvbuf=[u_part_aux[m+1, 0:], 1, MPI.DOUBLE], source=numprocs-2, recvtag=MPI.ANY_TAG,
+        #                    status=None)
         
     else:
-        # обмен слева
-        comm_cart.Sendrecv(sendbuf=[u_part_aux[m+1, 1:], 1, MPI.DOUBLE], dest=rank_cart-1, sendtag=0,
-                           recvbuf=[u_part_aux[m+1, 0:], 1, MPI.DOUBLE], source=rank_cart-1, recvtag=MPI.ANY_TAG,
-                           status=None)
+        # # обмен слева
+        # comm_cart.Sendrecv(sendbuf=[u_part_aux[m+1, 1:], 1, MPI.DOUBLE], dest=rank_cart-1, sendtag=0,
+        #                    recvbuf=[u_part_aux[m+1, 0:], 1, MPI.DOUBLE], source=rank_cart-1, recvtag=MPI.ANY_TAG,
+        #                    status=None)
         
         # обмен справа
         comm_cart.Sendrecv(sendbuf=[u_part_aux[m+1, N_part_aux-2:], 1, MPI.DOUBLE], dest=rank_cart+1, sendtag=0,
