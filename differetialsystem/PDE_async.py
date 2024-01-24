@@ -102,27 +102,73 @@ elif rank_cart == numprocs - 1:
     
 requests = [MPI.Request() for i in range(4)]
 
+if rank_cart == 0:
+    send1 = np.empty_like(u_part_aux[0, N_part_aux-2:])
+    recv1 = np.empty_like(u_part_aux[0, N_part_aux-1:])
+
+    requests[0] = comm_cart.Send_init([send1, 1, MPI.DOUBLE], dest=1, tag=0)
+    requests[1] = comm_cart.Recv_init([recv1, 1, MPI.DOUBLE], source=1, tag=MPI.ANY_TAG)
+
+elif rank_cart == numprocs-1:
+    send1 = np.empty_like(u_part_aux[0, 1:])
+    recv1 = np.empty_like(u_part_aux[0, 0:])
+
+    requests[0] = comm_cart.Send_init([send1, 1, MPI.DOUBLE], dest=numprocs-2, tag=0)
+    requests[1] = comm_cart.Recv_init([recv1, 1, MPI.DOUBLE], source=numprocs-2, tag=MPI.ANY_TAG)
+
+else:
+    send1 = np.empty_like(u_part_aux[0, 1:])
+    recv1 = np.empty_like(u_part_aux[0, 0:])
+    send2 = np.empty_like(u_part_aux[0, N_part_aux-2:])
+    recv2 = np.empty_like(u_part_aux[0, N_part_aux-1:])
+
+    requests[0] = comm_cart.Send_init([send1, 1, MPI.DOUBLE], dest=rank_cart-1, tag=0)
+    requests[1] = comm_cart.Recv_init([recv1, 1, MPI.DOUBLE], source=rank_cart-1, tag=MPI.ANY_TAG)
+
+    requests[2] = comm_cart.Send_init([send2, 1, MPI.DOUBLE], dest=rank_cart+1, tag=0)
+    requests[3] = comm_cart.Recv_init([recv2, 1, MPI.DOUBLE], source=rank_cart+1, tag=MPI.ANY_TAG)
+
+
 for m in range(M):
 
     # TODO: улучшение - выставляем сразу все асинхронные отправления и приемы,
     # выполняем серединный подсчет, а в конце с ожиданием запускаем подсчет крайних
+
+    # Запрос на отложенное взаимодействие
     if rank_cart == 0:
+        send1[:] = u_part_aux[m, N_part_aux-2:]
+        recv1[:] = u_part_aux[m, N_part_aux-1:]
+        MPI.Prequest.Startall(requests[0:2])
         
-        requests[0] = comm_cart.Isend([u_part_aux[m, N_part_aux-2:], 1, MPI.DOUBLE], dest=1, tag=0)
-        requests[1] = comm_cart.Irecv([u_part_aux[m, N_part_aux-1:], 1, MPI.DOUBLE], source=1, tag=MPI.ANY_TAG)
-
     elif rank_cart == numprocs-1:
+        send1[:] = u_part_aux[m, 1:]
+        recv1[:] = u_part_aux[m, 0:]
+        MPI.Prequest.Startall(requests[0:2])
         
-        requests[0] = comm_cart.Isend([u_part_aux[m, 1:], 1, MPI.DOUBLE], dest=numprocs-2, tag=0)
-        requests[1] = comm_cart.Irecv([u_part_aux[m, 0:], 1, MPI.DOUBLE], source=numprocs-2, tag=MPI.ANY_TAG)
-
     else:
-        
-        requests[0] = comm_cart.Isend([u_part_aux[m, 1:], 1, MPI.DOUBLE], dest=rank_cart-1, tag=0)
-        requests[1] = comm_cart.Irecv([u_part_aux[m, 0:], 1, MPI.DOUBLE], source=rank_cart-1, tag=MPI.ANY_TAG)
+        send1[:] = u_part_aux[m, 1:]
+        recv1[:] = u_part_aux[m, 0:]
+        send2[:] = u_part_aux[m, N_part_aux-2:]
+        recv2[:] = u_part_aux[m, N_part_aux-1:]
+        MPI.Prequest.Startall(requests)
 
-        requests[2] = comm_cart.Isend([u_part_aux[m, N_part_aux-2:], 1, MPI.DOUBLE], dest=rank_cart+1, tag=0)
-        requests[3] = comm_cart.Irecv([u_part_aux[m, N_part_aux-1:], 1, MPI.DOUBLE], source=rank_cart+1, tag=MPI.ANY_TAG)
+    # if rank_cart == 0:
+        
+    #     requests[0] = comm_cart.Isend([u_part_aux[m, N_part_aux-2:], 1, MPI.DOUBLE], dest=1, tag=0)
+    #     requests[1] = comm_cart.Irecv([u_part_aux[m, N_part_aux-1:], 1, MPI.DOUBLE], source=1, tag=MPI.ANY_TAG)
+
+    # elif rank_cart == numprocs-1:
+        
+    #     requests[0] = comm_cart.Isend([u_part_aux[m, 1:], 1, MPI.DOUBLE], dest=numprocs-2, tag=0)
+    #     requests[1] = comm_cart.Irecv([u_part_aux[m, 0:], 1, MPI.DOUBLE], source=numprocs-2, tag=MPI.ANY_TAG)
+
+    # else:
+        
+    #     requests[0] = comm_cart.Isend([u_part_aux[m, 1:], 1, MPI.DOUBLE], dest=rank_cart-1, tag=0)
+    #     requests[1] = comm_cart.Irecv([u_part_aux[m, 0:], 1, MPI.DOUBLE], source=rank_cart-1, tag=MPI.ANY_TAG)
+
+    #     requests[2] = comm_cart.Isend([u_part_aux[m, N_part_aux-2:], 1, MPI.DOUBLE], dest=rank_cart+1, tag=0)
+    #     requests[3] = comm_cart.Irecv([u_part_aux[m, N_part_aux-1:], 1, MPI.DOUBLE], source=rank_cart+1, tag=MPI.ANY_TAG)
 
     for n in range(2, N_part_aux - 2):
 
@@ -131,6 +177,14 @@ for m in range(M):
         u_part_aux[m+1, n] = left_part + right_part
 
     MPI.Request.Waitall(requests)
+
+    if rank_cart == 0:
+        u_part_aux[m, N_part_aux-1] = recv1[-1]
+    elif rank_cart == numprocs - 1:
+        u_part_aux[m, 0] = recv1[0]
+    else:
+        u_part_aux[m, 0] = recv1[0]
+        u_part_aux[m, N_part_aux-1] = recv2[-1]
 
     for n in [1, N_part_aux - 2]:
 
