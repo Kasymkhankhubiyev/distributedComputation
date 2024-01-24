@@ -49,7 +49,7 @@ def fill_u_1(m, N_part_aux, u_part_aux, eps, h, tau):
     return u_part_aux
 
 @jit(nopython=True, cache=True)
-def fill_u_2(m, n_s, u_part_aux, eps, h, tau):
+def fill_u_2(m, N_part_aux, u_part_aux, eps, h, tau):
     for n in [1, N_part_aux - 2]:
         left_part = u_part_aux[m, n] + eps * tau * (u_part_aux[m,n+1] - 2 * u_part_aux[m,n] + u_part_aux[m, n-1]) / h ** 2
         right_part = tau * u_part_aux[m, n] * (u_part_aux[m, n+1] - u_part_aux[m, n-1]) / (2 * h) + tau * u_part_aux[m, n] ** 3
