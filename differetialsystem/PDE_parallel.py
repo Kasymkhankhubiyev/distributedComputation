@@ -100,9 +100,12 @@ elif rank_cart == numprocs - 1:
     for m in range(1, M+1):
         u_part_aux[m, N_part_aux-1] = u_right(t[m])
     
-requests = [MPI.Request() for i in range(4)]
+requests = [MPI.Request() for i in range(2)]
 
 for m in range(M):
+
+    # TODO: улучшение - выставляем сразу все асинхронные отправления и приемы,
+    # выполняем серединный подсчет, а в конце с ожиданием запускаем подсчет крайних
 
     for n in range(1, N_part_aux - 1):
 
@@ -132,13 +135,23 @@ for m in range(M):
         #                         status=None)
                 
     if rank_cart == 0:
-        comm_cart.Sendrecv(sendbuf=[u_part_aux[m+1, N_part_aux-2:], 1, MPI.DOUBLE], dest=1, sendtag=0,
-                           recvbuf=[u_part_aux[m+1, N_part_aux-1:], 1, MPI.DOUBLE], source=1, recvtag=MPI.ANY_TAG,
-                           status=None)
+        # comm_cart.Sendrecv(sendbuf=[u_part_aux[m+1, N_part_aux-2:], 1, MPI.DOUBLE], dest=1, sendtag=0,
+        #                    recvbuf=[u_part_aux[m+1, N_part_aux-1:], 1, MPI.DOUBLE], source=1, recvtag=MPI.ANY_TAG,
+        #                    status=None)
+        
+        requests[0] = comm_cart.Isend([u_part_aux[m+1, N_part_aux-2:], 1, MPI.DOUBLE], dest=1, tag=0)
+        requests[1] = comm_cart.Irecv([u_part_aux[m+1, N_part_aux-1:], 1, MPI.DOUBLE], source=1, tag=MPI.ANY_TAG)
+        MPI.Request.Wait(requests[1], status=None)
+
     elif rank_cart == numprocs-1:
-        comm_cart.Sendrecv(sendbuf=[u_part_aux[m+1, 1:], 1, MPI.DOUBLE], dest=numprocs-2, sendtag=0,
-                           recvbuf=[u_part_aux[m+1, 0:], 1, MPI.DOUBLE], source=numprocs-2, recvtag=MPI.ANY_TAG,
-                           status=None)
+        # comm_cart.Sendrecv(sendbuf=[u_part_aux[m+1, 1:], 1, MPI.DOUBLE], dest=numprocs-2, sendtag=0,
+        #                    recvbuf=[u_part_aux[m+1, 0:], 1, MPI.DOUBLE], source=numprocs-2, recvtag=MPI.ANY_TAG,
+        #                    status=None)
+        
+        requests[0] = comm_cart.Isend([u_part_aux[m+1, 1:], 1, MPI.DOUBLE], dest=numprocs-2, tag=0)
+        requests[1] = comm_cart.Irecv([u_part_aux[m+1, 0:], 1, MPI.DOUBLE], source=numprocs-2, tag=MPI.ANY_TAG)
+        MPI.Request.Wait(requests[1], status=None)
+
     else:
         # # обмен слева
         # comm_cart.Sendrecv(sendbuf=[u_part_aux[m+1, 1:], 1, MPI.DOUBLE], dest=rank_cart-1, sendtag=0,
@@ -152,13 +165,13 @@ for m in range(M):
         # comm_cart.Sendrecv(sendbuf=[u_part_aux[m+1, N_part_aux-2:], 1, MPI.DOUBLE], dest=rank_cart+1, sendtag=0,
         #                    recvbuf=[u_part_aux[m+1, N_part_aux-1:], 1, MPI.DOUBLE], source=rank_cart+1, recvtag=MPI.ANY_TAG,
         #                    status=None)
-        # MPI.Request.Wait(requests[1], status=None)
-
-        requests[2] = comm_cart.Isend([u_part_aux[m+1, N_part_aux-2:], 1, MPI.DOUBLE], dest=rank_cart+1, tag=0)
-        requests[3] = comm_cart.Irecv([u_part_aux[m+1, N_part_aux-1:], 1, MPI.DOUBLE], source=rank_cart+1, tag=MPI.ANY_TAG)
-
         MPI.Request.Wait(requests[1], status=None)
-        MPI.Request.Wait(requests[3], status=None)
+
+        requests[0] = comm_cart.Isend([u_part_aux[m+1, N_part_aux-2:], 1, MPI.DOUBLE], dest=rank_cart+1, tag=0)
+        requests[1] = comm_cart.Irecv([u_part_aux[m+1, N_part_aux-1:], 1, MPI.DOUBLE], source=rank_cart+1, tag=MPI.ANY_TAG)
+
+        # MPI.Request.Wait(requests[1], status=None)
+        MPI.Request.Wait(requests[1], status=None)
 
 
 if rank_cart == 0:
