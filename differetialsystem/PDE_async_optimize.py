@@ -1,8 +1,7 @@
 import numpy as np
 from matplotlib.pyplot import style, figure, axes, show
 from mpi4py import MPI
-import time
-import sys
+from numba import jit
 
 
 comm = MPI.COMM_WORLD
@@ -39,6 +38,24 @@ def u_left(t) :
 def u_right(t) :
     u_right = 1.
     return u_right
+
+@jit(nopython=True, cache=True)
+def fill_u_1(m, N_part_aux, u_part_aux, eps, h, tau):
+    for n in range(2, N_part_aux - 2):
+        left_part = u_part_aux[m, n] + eps * tau * (u_part_aux[m,n+1] - 2 * u_part_aux[m,n] + u_part_aux[m, n-1]) / h ** 2
+        right_part = tau * u_part_aux[m, n] * (u_part_aux[m, n+1] - u_part_aux[m, n-1]) / (2 * h) + tau * u_part_aux[m, n] ** 3
+        u_part_aux[m+1, n] = left_part + right_part
+
+    return u_part_aux
+
+@jit(nopython=True, cache=True)
+def fill_u_2(m, n_s, u_part_aux, eps, h, tau):
+    for n in [1, N_part_aux - 2]:
+        left_part = u_part_aux[m, n] + eps * tau * (u_part_aux[m,n+1] - 2 * u_part_aux[m,n] + u_part_aux[m, n-1]) / h ** 2
+        right_part = tau * u_part_aux[m, n] * (u_part_aux[m, n+1] - u_part_aux[m, n-1]) / (2 * h) + tau * u_part_aux[m, n] ** 3
+        u_part_aux[m+1, n] = left_part + right_part
+
+    return u_part_aux
 
 
 def auxiallary_arrays(M: int, numprocs: int):
@@ -88,9 +105,7 @@ if rank_cart == 0:
     start_time = MPI.Wtime() # time.time()
 
 for n in range(N_part_aux) :
-    # print(u_part_aux[0, n])
     u_part_aux[0, n] = u_init(x[n + displ_aux])
-    # print(u_init(x[n + displ_aux]))
 
     
 if rank_cart == 0:
@@ -123,10 +138,6 @@ else:
 
 for m in range(M):
 
-    # TODO: улучшение - выставляем сразу все асинхронные отправления и приемы,
-    # выполняем серединный подсчет, а в конце с ожиданием запускаем подсчет крайних
-
-    # Запрос на отложенное взаимодействие
     if rank_cart == 0:
         buffer[0] = u_part_aux[m, N_part_aux-2]
         buffer[1] = u_part_aux[m, N_part_aux-1]
@@ -144,29 +155,7 @@ for m in range(M):
         buffer[3] = u_part_aux[m, N_part_aux-1]
         MPI.Prequest.Startall(requests)
 
-    # if rank_cart == 0:
-        
-    #     requests[0] = comm_cart.Isend([u_part_aux[m, N_part_aux-2:], 1, MPI.DOUBLE], dest=1, tag=0)
-    #     requests[1] = comm_cart.Irecv([u_part_aux[m, N_part_aux-1:], 1, MPI.DOUBLE], source=1, tag=MPI.ANY_TAG)
-
-    # elif rank_cart == numprocs-1:
-        
-    #     requests[0] = comm_cart.Isend([u_part_aux[m, 1:], 1, MPI.DOUBLE], dest=numprocs-2, tag=0)
-    #     requests[1] = comm_cart.Irecv([u_part_aux[m, 0:], 1, MPI.DOUBLE], source=numprocs-2, tag=MPI.ANY_TAG)
-
-    # else:
-        
-    #     requests[0] = comm_cart.Isend([u_part_aux[m, 1:], 1, MPI.DOUBLE], dest=rank_cart-1, tag=0)
-    #     requests[1] = comm_cart.Irecv([u_part_aux[m, 0:], 1, MPI.DOUBLE], source=rank_cart-1, tag=MPI.ANY_TAG)
-
-    #     requests[2] = comm_cart.Isend([u_part_aux[m, N_part_aux-2:], 1, MPI.DOUBLE], dest=rank_cart+1, tag=0)
-    #     requests[3] = comm_cart.Irecv([u_part_aux[m, N_part_aux-1:], 1, MPI.DOUBLE], source=rank_cart+1, tag=MPI.ANY_TAG)
-
-    for n in range(2, N_part_aux - 2):
-
-        left_part = u_part_aux[m, n] + eps * tau * (u_part_aux[m,n+1] - 2 * u_part_aux[m,n] + u_part_aux[m, n-1]) / h ** 2
-        right_part = tau * u_part_aux[m, n] * (u_part_aux[m, n+1] - u_part_aux[m, n-1]) / (2 * h) + tau * u_part_aux[m, n] ** 3
-        u_part_aux[m+1, n] = left_part + right_part
+    u_part_aux = fill_u_1(m, N_part_aux, u_part_aux, eps, h, tau)
 
     MPI.Request.Waitall(requests)
 
@@ -178,11 +167,7 @@ for m in range(M):
         u_part_aux[m, 0] = buffer[1]
         u_part_aux[m, N_part_aux-1] = buffer[3]
 
-    for n in [1, N_part_aux - 2]:
-
-        left_part = u_part_aux[m, n] + eps * tau * (u_part_aux[m,n+1] - 2 * u_part_aux[m,n] + u_part_aux[m, n-1]) / h ** 2
-        right_part = tau * u_part_aux[m, n] * (u_part_aux[m, n+1] - u_part_aux[m, n-1]) / (2 * h) + tau * u_part_aux[m, n] ** 3
-        u_part_aux[m+1, n] = left_part + right_part
+    u_part_aux = fill_u_2(m, N_part_aux, u_part_aux, eps, h, tau)
 
 
 if rank_cart == 0:
